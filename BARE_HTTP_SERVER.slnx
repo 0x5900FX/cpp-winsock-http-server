@@ -3,5 +3,5 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="BARE_HTTP_SERVER/BARE_HTTP_SERVER.vcxproj" />
+  <Project Path="BARE_HTTP_SERVER/BARE_HTTP_SERVER.vcxproj" Id="b1157af2-500f-4c63-b219-34d06f445f48" />
 </Solution>

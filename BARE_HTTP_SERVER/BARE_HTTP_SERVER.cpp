@@ -207,7 +207,6 @@ private:
 
 
 };
-
 class Router {
 public:
 	void add_route(const std::string& method, const std::string& path, std::function<Response(const Request&)> handler) {
@@ -238,6 +237,87 @@ private:
 
 };
 
+
+void handle_client(SOCKET clientSoc, StaticFileServer& fileserver , Router& router) {
+
+	try{
+	if (clientSoc == INVALID_SOCKET) {
+		std::println("Accept failed with error: {}", WSAGetLastError());
+			
+	}
+	else
+	{
+		std::println("Client Connected ");
+
+		string req;
+		unordered_map<string, string > headers;
+		char buffer[1024]{ 0 };
+		string method, path, http_version;
+
+		while (true) {
+			int n = recv(clientSoc, buffer, sizeof(buffer), 0);
+			if (n <= 0) { break; }
+			req.append(buffer, n);
+			if (req.find("\r\n\r\n") != std::string::npos) { break; }
+
+
+		}
+		std::istringstream iss(req);
+		string first_line;
+		getline(iss, first_line);
+		std::istringstream req_spliter(first_line);
+		req_spliter >> method >> path >> http_version;
+
+		while (true) {
+			string header, value;
+			getline(iss, first_line);
+			if (first_line == "\r" || first_line == "") { break; }
+			auto pos = first_line.find_first_of(':');
+			if (pos == string::npos) { continue; }
+			header = first_line.substr(0, pos);
+			value = first_line.substr(pos + 1, first_line.length() - pos - 1);
+
+			std::transform(header.begin(), header.end(), header.begin(), [](unsigned char  c) { return std::tolower(c); });
+
+			headers.insert({ header, value });
+			std::println("Appended Header: {}, Value: {}", header, value);
+
+
+		}
+
+
+
+		std::println("Request received: {}", first_line);
+		std::println("Method: {}, Path: {}, HTTP Version: {}", method, path, http_version);
+
+		Request U_req{ method, path, http_version };
+		Response U_resp = router.dispatch_req(U_req, fileserver);
+		string string_response = U_resp.send_response();
+
+
+		int bytes_sent = send(
+			clientSoc,
+			string_response.c_str(),
+			static_cast<int>(string_response.length()),
+			0);
+
+		if (bytes_sent != SOCKET_ERROR) {
+			std::println("Sent response of {} bytes", bytes_sent);
+		}
+		else {
+			std::println("send failed with error: {}", WSAGetLastError());
+		}
+	
+	}
+	}
+	catch (const exception& e) {
+		std::println("Exception occurred while handling client: {}", e.what());
+
+		closesocket(clientSoc);
+	}
+
+
+}
 
 
 
@@ -305,77 +385,9 @@ int main() {
 
 
 		SOCKET clientSoc = accept(S, nullptr, nullptr);
-		if (clientSoc == INVALID_SOCKET) {
-			std::println("Accept failed with error: {}", WSAGetLastError());
-			break;
-		}
-		else
-		{
-			std::println("Client Connected ");
 
-			string req;
-			unordered_map<string, string > headers;
-			char buffer[1024]{ 0 };
-			string method, path, http_version;
-
-			while (true) {
-				int n = recv(clientSoc, buffer, sizeof(buffer), 0);
-				if (n <= 0) { break; }
-				req.append(buffer, n);
-				if (req.find("\r\n\r\n") != std::string::npos) { break; }
-
-
-			}
-			std::istringstream iss(req);
-			string first_line;
-			getline(iss, first_line);
-			std::istringstream req_spliter(first_line);
-			req_spliter >> method >> path >> http_version;
-
-			while (true) {
-				string header, value;
-				getline(iss, first_line);
-				if (first_line == "\r" || first_line == "") { break; }
-				auto pos = first_line.find_first_of(':');
-				if (pos == string::npos) { continue; }
-				header = first_line.substr(0, pos);
-				value = first_line.substr(pos + 1, first_line.length() - pos - 1);
-
-				std::transform(header.begin(), header.end(), header.begin(), [](unsigned char  c) { return std::tolower(c); });
-
-				headers.insert({ header, value });
-				std::println("Appended Header: {}, Value: {}", header, value);
-
-
-			}
-
-
-
-			std::println("Request received: {}", first_line);
-			std::println("Method: {}, Path: {}, HTTP Version: {}", method, path, http_version);
-
-			Request U_req{ method, path, http_version };
-			Response U_resp = router.dispatch_req(U_req, fileserver);
-			string string_response = U_resp.send_response();
-
-
-			int bytes_sent = send(
-				clientSoc,
-				string_response.c_str(),
-				static_cast<int>(string_response.length()),
-				0);
-
-			if (bytes_sent != SOCKET_ERROR) {
-				std::println("Sent response of {} bytes", bytes_sent);
-			}
-			else {
-				std::println("send failed with error: {}", WSAGetLastError());
-			}
-
-			closesocket(clientSoc);
-		}
-
-
+		
+		handle_client(clientSoc, fileserver, router);
 
 	}
 	closesocket(S);

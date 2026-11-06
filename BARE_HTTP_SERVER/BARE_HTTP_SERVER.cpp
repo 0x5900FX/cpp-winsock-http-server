@@ -17,6 +17,7 @@
 #include <istream>
 #include <iterator>
 #include <thread>
+#include <chrono>
 
 using namespace std;
 
@@ -241,12 +242,7 @@ private:
 void handle_client(SOCKET clientSoc, StaticFileServer& fileserver , Router& router) {
 
 	try{
-	if (clientSoc == INVALID_SOCKET) {
-		std::println("Accept failed with error: {}", WSAGetLastError());
-			
-	}
-	else
-	{
+
 		std::println("Client Connected ");
 
 		string req;
@@ -308,14 +304,13 @@ void handle_client(SOCKET clientSoc, StaticFileServer& fileserver , Router& rout
 			std::println("send failed with error: {}", WSAGetLastError());
 		}
 	
-	}
+	
 	}
 	catch (const exception& e) {
 		std::println("Exception occurred while handling client: {}", e.what());
 
-		closesocket(clientSoc);
 	}
-
+	closesocket(clientSoc);
 
 }
 
@@ -385,10 +380,13 @@ int main() {
 
 
 		SOCKET clientSoc = accept(S, nullptr, nullptr);
+		if (clientSoc == INVALID_SOCKET) {
+			std::println("Accept failed with error: {}", WSAGetLastError());
+			continue;
+		}
 
 		
-		handle_client(clientSoc, fileserver, router);
-
+		thread(handle_client, clientSoc, std::ref(fileserver), std::ref(router)).detach();
 	}
 	closesocket(S);
 
